@@ -146,29 +146,30 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
     def _run(self):
         while not self._complete.is_set():
             cluster_summaries = []
-            try:
-                clusters = central_store_util.get_cluster_ids()
-                for clusterid in clusters:
-                    gevent.sleep(0.1)
+            clusters = central_store_util.get_cluster_ids()
+            for clusterid in clusters:
+                gevent.sleep(0.1)
+                try:
                     cluster_summary = self.parse_cluster(clusterid)
                     cluster_summaries.append(cluster_summary.copy())
                     cluster_summary.save(update=False)
-                NS.sds_monitoring_manager.compute_system_summary(
-                    cluster_summaries
-                )
-            except EtcdKeyNotFound:
-                pass
-            except Exception as ex:
-                Event(
-                    ExceptionMessage(
-                        priority="debug",
-                        publisher=NS.publisher_id,
-                        payload={
-                            "message": 'Error caught computing summary.',
-                            "exception": ex
-                        }
+                except EtcdKeyNotFound:
+                    pass
+                except Exception as ex:
+                    Event(
+                        ExceptionMessage(
+                            priority="debug",
+                            publisher=NS.publisher_id,
+                            payload={
+                                "message": 'Error caught computing summary.',
+                                "exception": ex
+                            }
+                        )
                     )
-                )
+                    continue
+            NS.sds_monitoring_manager.compute_system_summary(
+                cluster_summaries
+            )
             gevent.sleep(60)
 
     def stop(self):
