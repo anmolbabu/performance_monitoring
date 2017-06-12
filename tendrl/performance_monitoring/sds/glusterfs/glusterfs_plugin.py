@@ -71,35 +71,22 @@ class GlusterFSPlugin(SDSPlugin):
             })
         return configs
 
-    def get_brick_status_wise_counts(self, cluster_id, volumes_det):
+    def get_brick_status_wise_counts(self, cluster_id, bricks):
         brick_status_wise_counts = {
             'stopped': 0,
             'total': 0,
             pm_consts.WARNING_ALERTS: 0,
             pm_consts.CRITICAL_ALERTS: 0
         }
-        try:
-            for volume_id, volume_det in volumes_det.iteritems():
-                for brick_path, brick_det in volume_det.get(
-                    'Bricks',
-                    {}
-                ).iteritems():
-                    if brick_det['status'] == 'Stopped':
-                        brick_status_wise_counts['stopped'] = \
-                            brick_status_wise_counts['stopped'] + 1
-                    brick_status_wise_counts['total'] = \
-                        brick_status_wise_counts['total'] + 1
-        except Exception as ex:
-            Event(
-                ExceptionMessage(
-                    priority="debug",
-                    publisher=NS.publisher_id,
-                    payload={"message": "Exception caught computing brick "
-                                        "status wise counts",
-                             "exception": ex
-                             }
-                )
-            )
+        for brick_path, brick_det in bricks.iteritems():
+            if (
+                'status' in brick_det and
+                brick_det['status'] == 'Stopped'
+            ):
+                brick_status_wise_counts['stopped'] = \
+                    brick_status_wise_counts['stopped'] + 1
+            brick_status_wise_counts['total'] = \
+                brick_status_wise_counts['total'] + 1
         crit_alerts, warn_alerts = parse_resource_alerts(
             'brick',
             pm_consts.CLUSTER,
@@ -196,34 +183,63 @@ class GlusterFSPlugin(SDSPlugin):
             most_used_volumes.append(vol_det)
         return most_used_volumes[:5]
 
-    def get_most_used_bricks(self, cluster_name, volumes_det):
-        brick_utilizations = []
+    def get_cluster_bricks(self, cluster_id):
+        ret_val = {}
         try:
-            for volume_id, volume_det in volumes_det.iteritems():
-                for brick_path, brick_det in volume_det.get(
-                    'Bricks',
-                    {}
-                ).iteritems():
-                    if (
-                        'utilization' not in brick_det or
-                        not brick_det['utilization']
-                    ):
-                        continue
-                    brick_det['utilization']['brick_path'] = brick_path
-                    brick_det['utilization']['vol_name'] = volume_det['name']
-                    brick_det['utilization']['cluster_name'] = cluster_name
-                    brick_utilizations.append(brick_det['utilization'])
-        except Exception as ex:
-            Event(
-                ExceptionMessage(
-                    priority="debug",
-                    publisher=NS.publisher_id,
-                    payload={"message": "Exception caught computing most used "
-                                        "bricks",
-                             "exception": ex
-                             }
-                )
+            etcd_bricks = NS._int.client.read(
+                '/clusters/%s/Bricks/all' % cluster_id
             )
+        except EtcdKeyNotFound:
+            return ret_val
+        for etcd_brick in etcd_bricks.leaves:
+            try:
+                etcd_brick_key_contents = etcd_brick.key.split('/')
+                brick = etcd_read_key(
+                    '/clusters/%s/Bricks/all/%s' % (
+                        cluster_id,
+                        etcd_brick_key_contents[5]
+                    )
+                )
+                if 'vol_id' not in brick:
+                    continue
+                if (
+                    'utilization' in brick and
+                    'brick_path' in brick
+                ):
+                    brick['utilization']['vol_name'] = \
+                        central_store_util.get_volume_name(
+                            cluster_id,
+                            brick['vol_id']
+                    )
+                    brick['utilization']['cluster_name'] = \
+                        central_store_util.get_cluster_name(cluster_id)
+                    brick['utilization']['brick_path'] = \
+                        brick['brick_path']
+                    brick['utilization']['hostname'] = \
+                        brick['hostname']
+                ret_val[etcd_brick_key_contents[5]] = brick
+            except EtcdKeyNotFound as ex:
+                Event(
+                    ExceptionMessage(
+                        priority="debug",
+                        publisher=NS.publisher_id,
+                        payload={
+                            "message": "Error fetching details for %s"
+                            " brick" % etcd_brick.key,
+                            "exception": ex
+                        }
+                    )
+                )
+                continue
+        return ret_val
+
+    def get_most_used_bricks(self, bricks):
+        brick_utilizations = []
+        if not bricks:
+            return brick_utilizations
+        for brick_path, brick_det in bricks.iteritems():
+            if 'utilization' in brick_det:
+                brick_utilizations.append(brick_det['utilization'])
         brick_utilizations = sorted(
             brick_utilizations,
             key=lambda k: k['used_percent']
@@ -238,6 +254,7 @@ class GlusterFSPlugin(SDSPlugin):
             cluster_node_ids
         )
         volumes = self.get_cluster_volumes(cluster_id)
+        bricks = self.get_cluster_bricks(cluster_id)
         ret_val['volume_status_wise_counts'] = \
             self.get_volume_status_wise_counts(
                 cluster_id,
@@ -246,7 +263,7 @@ class GlusterFSPlugin(SDSPlugin):
         ret_val['brick_status_wise_counts'] = \
             self.get_brick_status_wise_counts(
                 cluster_id,
-                volumes
+                bricks
         )
         ret_val['most_used_volumes'] = self.get_most_used_volumes(
             cluster_name,
@@ -258,8 +275,7 @@ class GlusterFSPlugin(SDSPlugin):
             cluster_id
         )
         ret_val['most_used_bricks'] = self.get_most_used_bricks(
-            cluster_id,
-            volumes
+            bricks
         )
         connection_active = 0
         try:
@@ -461,7 +477,7 @@ class GlusterFSPlugin(SDSPlugin):
         except Exception as ex:
             Event(
                 ExceptionMessage(
-                    priority="debug",
+                    priority="error",
                     publisher=NS.publisher_id,
                     payload={"message": "Exception caught computing system "
                                         "summary.",
@@ -477,6 +493,7 @@ class GlusterFSPlugin(SDSPlugin):
         for ip, indexed_node_id in ip_indexes.iteritems():
             if node_id == indexed_node_id:
                 node_ip = ip
+                break
         brick_status_wise_counts = {
             'stopped': 0,
             'total': 0,
@@ -488,21 +505,20 @@ class GlusterFSPlugin(SDSPlugin):
                 node_id
             )
             if cluster_id:
-                volumes_det = self.get_cluster_volumes(cluster_id)
-                for volume_id, volume_det in volumes_det.iteritems():
-                    for brick_path, brick_det in volume_det.get(
-                        'Bricks',
-                        {}
-                    ).iteritems():
+                bricks = self.get_cluster_bricks(cluster_id)
+                for brick_path, brick_det in bricks.iteritems():
+                    if (
+                        brick_det['hostname'] == node_name or
+                        brick_det['hostname'] == node_ip
+                    ):
                         if (
-                            brick_det['hostname'] == node_name or
-                            brick_det['hostname'] == node_ip
+                            'status' in brick_det and
+                            brick_det['status'] == 'Stopped'
                         ):
-                            if brick_det['status'] == 'Stopped':
-                                brick_status_wise_counts['stopped'] = \
-                                    brick_status_wise_counts['stopped'] + 1
-                            brick_status_wise_counts['total'] = \
-                                brick_status_wise_counts['total'] + 1
+                            brick_status_wise_counts['stopped'] = \
+                                brick_status_wise_counts['stopped'] + 1
+                        brick_status_wise_counts['total'] = \
+                            brick_status_wise_counts['total'] + 1
             crit_alerts, warn_alerts = parse_resource_alerts(
                 'brick',
                 pm_consts.CLUSTER,

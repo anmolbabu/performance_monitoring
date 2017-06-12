@@ -378,6 +378,15 @@ def get_cluster_name(cluster_id):
     ).value
 
 
+def get_volume_name(cluster_id, vol_id):
+    return NS._int.client.read(
+        '/clusters/%s/Volumes/%s/name' % (
+            cluster_id,
+            vol_id
+        )
+    ).value
+
+
 def get_node_sds_name(node_id):
     sds_name = ''
     try:
