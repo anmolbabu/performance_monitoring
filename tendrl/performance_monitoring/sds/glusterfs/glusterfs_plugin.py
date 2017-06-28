@@ -13,9 +13,15 @@ from tendrl.performance_monitoring.objects.system_summary \
 from tendrl.performance_monitoring.sds import SDSPlugin
 import tendrl.performance_monitoring.utils.central_store_util \
     as central_store_util
+import tendrl.performance_monitoring.utils.threshold_utils as threshold_utils
 from tendrl.performance_monitoring.utils.util import parse_resource_alerts
 from tendrl.performance_monitoring.utils.central_store_util \
     import read as etcd_read_key
+
+
+class GlusterUtilizationTypes(threshold_utils.UtilizationTypes):
+    VOLUME_UTILIZATION = 'volume_utilization'
+    BRICK_UTILIZATION = 'brick_utilization'
 
 
 class GlusterFSPlugin(SDSPlugin):
@@ -42,10 +48,13 @@ class GlusterFSPlugin(SDSPlugin):
                     node_id
                 )
             )
-            config = NS.performance_monitoring.config.data['thresholds']
+            config = threshold_utils.get_thresholds(
+                integration_id=sds_tendrl_context['integration_id'],
+                sds_name=sds_tendrl_context['sds_name']
+            )
             if isinstance(config, basestring):
                 config = ast.literal_eval(config.encode('ascii', 'ignore'))
-            for plugin, plugin_config in config[self.name].iteritems():
+            for plugin, plugin_config in config.iteritems():
                 if isinstance(plugin_config, basestring):
                     plugin_config = ast.literal_eval(
                         plugin_config.encode('ascii', 'ignore')
@@ -128,6 +137,7 @@ class GlusterFSPlugin(SDSPlugin):
                         volume_id
                     )
                 )
+                volume['integration_id'] = cluster_id
                 volumes[volume_id] = volume
             except EtcdKeyNotFound:
                 continue
@@ -179,6 +189,12 @@ class GlusterFSPlugin(SDSPlugin):
         for volume_id in v_sort:
             vol_det = volumes_det.get(volume_id)
             vol_det['cluster_name'] = cluster_name
+            vol_det['state'] = threshold_utils.get_utilization_state(
+                utilization_type=GlusterUtilizationTypes.VOLUME_UTILIZATION,
+                utilization_val=vol_det['pcnt_used'],
+                integration_id=vol_det['integration_id'],
+                sds_name=self.name
+            )
             most_used_volumes.append(vol_det)
         return most_used_volumes[:5]
 
@@ -216,6 +232,13 @@ class GlusterFSPlugin(SDSPlugin):
                         brick['brick_path']
                     brick['utilization']['hostname'] = \
                         brick['hostname']
+                    brick['utilization']['state'] = \
+                        threshold_utils.get_utilization_state(
+                            utilization_type=GlusterUtilizationTypes.BRICK_UTILIZATION,
+                            utilization_val=brick['utilization']['used_percent'],
+                            integration_id=cluster_id,
+                            sds_name=self.name
+                    )
                 ret_val[etcd_brick_key_contents[5]] = brick
             except EtcdKeyNotFound as ex:
                 Event(

@@ -81,4 +81,14 @@ namespace.performance_monitoring:
       value: monitoring/plugin_configurations/nodes/$NodeMonitoringPlugin.node_id/$NodeMonitoringPlugin.plugin_name
       list: monitoring/plugin_configurations/nodes/$NodeMonitoringPlugin.node_id
       help: "Monitoring plugin configurations on node"
+    Thresholds:
+      attrs:
+        thresholds:
+          type: json
+        cluster_id:
+          type: String
+      enabled: true
+      value: monitoring/config/thresholds/clusters/$Thresholds.cluster_id
+      list: monitoring/config/thresholds/clusters
+      help: "Cluster thresholds"
 tendrl_schema_version: 0.3

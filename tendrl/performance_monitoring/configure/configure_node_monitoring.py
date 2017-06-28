@@ -7,6 +7,7 @@ from tendrl.commons.message import ExceptionMessage
 from tendrl.performance_monitoring.utils.util import initiate_config_generation
 import tendrl.performance_monitoring.utils.central_store_util \
     as central_store_util
+import tendrl.performance_monitoring.utils.threshold_utils as threshold_utils
 
 
 class ConfigureNodeMonitoring(gevent.greenlet.Greenlet):
@@ -94,10 +95,12 @@ class ConfigureNodeMonitoring(gevent.greenlet.Greenlet):
                 }
             }
         )
-        config = NS.performance_monitoring.config.data['thresholds']
+        config = threshold_utils.get_thresholds(
+            node_id=node_det['node_id']
+        )
         if isinstance(config, basestring):
             config = ast.literal_eval(config.encode('ascii', 'ignore'))
-        for plugin, plugin_config in config['node'].iteritems():
+        for plugin, plugin_config in config.iteritems():
             if isinstance(plugin_config, basestring):
                 plugin_config = ast.literal_eval(
                     plugin_config.encode('ascii', 'ignore')

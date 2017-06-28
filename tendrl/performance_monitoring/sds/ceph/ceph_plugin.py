@@ -17,8 +17,15 @@ from tendrl.performance_monitoring.sds.ceph.pg_utils \
 import tendrl.performance_monitoring.utils.central_store_util \
     as central_store_util
 from tendrl.performance_monitoring.utils.util import parse_resource_alerts
+import tendrl.performance_monitoring.utils.threshold_utils as threshold_utils
 from tendrl.performance_monitoring.utils.central_store_util \
     import read as etcd_read_key
+
+
+class CephUtilizationTypes(threshold_utils.UtilizationTypes):
+    POOL_UTILIZATION = 'pool_utilization'
+    OSD_UTILIZATION = 'osd_utilization'
+    RBD_UTILIZATION = 'rbd_utilization'
 
 
 class CephPlugin(SDSPlugin):
@@ -47,12 +54,15 @@ class CephPlugin(SDSPlugin):
                 )
             )
             if 'mon' in sds_node_context['tags']:
-                config = NS.performance_monitoring.config.data['thresholds']
+                config = threshold_utils.get_thresholds(
+                    integration_id=sds_tendrl_context['integration_id'],
+                    sds_name=sds_tendrl_context['sds_name']
+                )
                 if isinstance(config, basestring):
                     config = ast.literal_eval(
                         config.encode('ascii', 'ignore')
                     )
-                for plugin, plugin_config in config[self.name].iteritems():
+                for plugin, plugin_config in config.iteritems():
                     if isinstance(plugin_config, basestring):
                         plugin_config = ast.literal_eval(
                             plugin_config.encode('ascii', 'ignore')
@@ -169,6 +179,7 @@ class CephPlugin(SDSPlugin):
                         pool_id
                     )
                 )
+                pool['integration_id'] = cluster_id
                 pools[pool_id] = pool
         except (EtcdKeyNotFound, TendrlPerformanceMonitoringException):
             pass
@@ -181,6 +192,12 @@ class CephPlugin(SDSPlugin):
         for pool_id in p_sort:
             pool_det = pools.get(pool_id)
             pool_det['cluster_name'] = cluster_name
+            pool_det['state'] = threshold_utils.get_utilization_state(
+                utilization_type=CephUtilizationTypes.POOL_UTILIZATION,
+                utilization_val=pool_det['percent_used'],
+                integration_id=pool_det['integration_id'],
+                sds_name=self.name
+            )
             most_used_pools.append(pool_det)
         return most_used_pools[:5]
 
@@ -267,6 +284,7 @@ class CephPlugin(SDSPlugin):
                             rbd
                         )
                     )
+                    rbd_dict['integration_id'] = cluster_id
                     rbds.append(rbd_dict)
                 except (EtcdKeyNotFound, TendrlPerformanceMonitoringException):
                     continue
@@ -284,6 +302,12 @@ class CephPlugin(SDSPlugin):
                 ) / (
                     int(rbd['provisioned']) * 1.0
                 )
+            rbds[index]['state'] = threshold_utils.get_utilization_state(
+                utilization_type=CephUtilizationTypes.RBD_UTILIZATION,
+                utilization_val=rbds[index]['percent_used'],
+                integration_id=rbds[index]['integration_id'],
+                sds_name=self.name
+            )
         most_used_rbds = sorted(rbds, key=lambda k: k['percent_used'])
         most_used_rbds.reverse()
         return most_used_rbds[:5]

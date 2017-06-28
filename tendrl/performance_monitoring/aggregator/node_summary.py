@@ -18,6 +18,7 @@ from tendrl.performance_monitoring.objects.node_summary \
     import NodeSummary
 import tendrl.performance_monitoring.utils.central_store_util \
     as central_store_util
+import tendrl.performance_monitoring.utils.threshold_utils as threshold_utils
 from tendrl.performance_monitoring.utils.util import get_latest_node_stat
 from tendrl.performance_monitoring.utils.util import get_latest_stats
 
@@ -44,6 +45,11 @@ class NodeSummarise(gevent.greenlet.Greenlet):
             )
             return {
                 'percent_used': str(percent_user + percent_system),
+                'state': threshold_utils.get_utilization_state(
+                    utilization_type=threshold_utils.UtilizationTypes.CPU,
+                    utilization_val=(percent_user + percent_system),
+                    node_id=node
+                ),
                 'updated_at': datetime.datetime.now().isoformat()
             }
         except (
@@ -63,6 +69,11 @@ class NodeSummarise(gevent.greenlet.Greenlet):
                 'used': str(used),
                 'percent_used': str(percent_used),
                 'total': str(total),
+                'state': threshold_utils.get_utilization_state(
+                    utilization_type=threshold_utils.UtilizationTypes.MEMORY,
+                    utilization_val=percent_used,
+                    node_id=node
+                ),
                 'updated_at': datetime.datetime.now().isoformat()
             }
         except (
@@ -97,6 +108,11 @@ class NodeSummarise(gevent.greenlet.Greenlet):
                 'used': str(used),
                 'percent_used': str(percent_used),
                 'total': str(total),
+                'state': threshold_utils.get_utilization_state(
+                    utilization_type=threshold_utils.UtilizationTypes.SWAP,
+                    utilization_val=percent_used,
+                    node_id=node
+                ),
                 'updated_at': datetime.datetime.now().isoformat()
             }
         except (
@@ -139,6 +155,11 @@ class NodeSummarise(gevent.greenlet.Greenlet):
                 'used': str(used),
                 'total': str(used + free),
                 'percent_used': str(percent_used),
+                'state': threshold_utils.get_utilization_state(
+                    utilization_type=threshold_utils.UtilizationTypes.MOUNT_POINT,
+                    utilization_val=percent_used,
+                    node_id=node
+                ),
                 'updated_at': datetime.datetime.now().isoformat()
             }
         except (

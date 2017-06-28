@@ -12,6 +12,7 @@ from tendrl.performance_monitoring.objects.cluster_summary \
     import ClusterSummary
 import tendrl.performance_monitoring.utils.central_store_util \
     as central_store_util
+import tendrl.performance_monitoring.utils.threshold_utils as threshold_utils
 from tendrl.performance_monitoring.utils.util import get_latest_stat
 
 
@@ -194,7 +195,13 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
             utilization={
                 'total': int(total),
                 'used': int(used),
-                'percent_used': float(percent_used)
+                'percent_used': float(percent_used),
+                'state': threshold_utils.get_utilization_state(
+                    utilization_type=threshold_utils.UtilizationTypes.CLUSTER_UTILIZATION,
+                    utilization_val=float(percent_used),
+                    integration_id=cluster_id,
+                    sds_name=sds_name
+                ),
             },
             iops=str(self.get_cluster_iops(cluster_id)),
             hosts_count=self.parse_host_count(cluster_id),
