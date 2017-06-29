@@ -79,9 +79,9 @@ def get_nodestats(node_id, resource_name):
 
 
 @app.route(
-    "/monitoring/clusters/<cluster_id>/utilization/<utiliation_type>/stats"
+    "/monitoring/clusters/<integration_id>/utilization/<utiliation_type>/stats"
 )
-def get_clusterutilization(cluster_id, utiliation_type):
+def get_clusterutilization(integration_id, utiliation_type):
     try:
         start_time = None
         end_time = None
@@ -98,14 +98,14 @@ def get_clusterutilization(cluster_id, utiliation_type):
             get_timeseriesnamefromresource(
                 resource_name=pm_consts.CLUSTER_UTILIZATION,
                 utilization_type=utiliation_type,
-                cluster_id=cluster_id
+                integration_id=integration_id
             ).split(
                 NS.time_series_db_manager.get_plugin().get_delimeter(),
                 1
             )
-        # Validate cluster_id. Attempt to fetch clusters/cluster_id fails
+        # Validate integration_id. Attempt to fetch clusters/integration_id fails
         # with EtcdKeyNotFound if cluster if is invalid
-        central_store_util.read_key('/clusters/%s' % cluster_id)
+        central_store_util.read_key('/clusters/%s' % integration_id)
         return Response(
             NS.time_series_db_manager.\
             get_plugin().\
@@ -131,8 +131,8 @@ def get_clusterutilization(cluster_id, utiliation_type):
         return Response(str(ex), status=500, mimetype='application/json')
 
 
-@app.route("/monitoring/clusters/<cluster_id>/latency/stats")
-def get_cluster_latency(cluster_id):
+@app.route("/monitoring/clusters/<integration_id>/latency/stats")
+def get_cluster_latency(integration_id):
     try:
         start_time = None
         end_time = None
@@ -146,7 +146,7 @@ def get_cluster_latency(cluster_id):
                 elif request_param[0] == "interval":
                     time_interval = request_param[1]
         nodes_in_cluster = central_store_util.get_node_names_in_cluster(
-            cluster_id
+            integration_id
         )
         metric_name = NS.time_series_db_manager.get_timeseriesnamefromresource(
             resource_name=pm_consts.LATENCY,
@@ -175,9 +175,9 @@ def get_cluster_latency(cluster_id):
 
 
 @app.route(
-    "/monitoring/clusters/<cluster_id>/iops/stats"
+    "/monitoring/clusters/<integration_id>/iops/stats"
 )
-def get_cluster_iops(cluster_id):
+def get_cluster_iops(integration_id):
     try:
         start_time = None
         end_time = None
@@ -192,16 +192,16 @@ def get_cluster_iops(cluster_id):
                     time_interval = request_param[1]
         entity_name, metric_name = NS.time_series_db_manager.\
             get_timeseriesnamefromresource(
-                cluster_id=cluster_id,
+                integration_id=integration_id,
                 resource_name=pm_consts.IOPS,
                 utilization_type=pm_consts.TOTAL
             ).split(
                 NS.time_series_db_manager.get_plugin().get_delimeter(),
                 1
             )
-        # Validate cluster_id. Attempt to fetch clusters/cluster_id fails
+        # Validate integration_id. Attempt to fetch clusters/integration_id fails
         # with EtcdKeyNotFound if cluster if is invalid
-        central_store_util.read_key('/clusters/%s' % cluster_id)
+        central_store_util.read_key('/clusters/%s' % integration_id)
         return Response(
             NS.time_series_db_manager.get_plugin().get_metric_stats(
                 entity_name,
@@ -226,9 +226,9 @@ def get_cluster_iops(cluster_id):
 
 
 @app.route(
-    "/monitoring/clusters/<cluster_id>/throughput/<network_type>/stats"
+    "/monitoring/clusters/<integration_id>/throughput/<network_type>/stats"
 )
-def get_clusterthroughput(cluster_id, network_type):
+def get_clusterthroughput(integration_id, network_type):
     try:
         start_time = None
         end_time = None
@@ -243,7 +243,7 @@ def get_clusterthroughput(cluster_id, network_type):
                     time_interval = request_param[1]
         entity_name, metric_name = NS.time_series_db_manager.\
             get_timeseriesnamefromresource(
-                cluster_id=cluster_id,
+                integration_id=integration_id,
                 network_type=network_type,
                 resource_name=pm_consts.CLUSTER_THROUGHPUT,
                 utilization_type=pm_consts.USED
@@ -251,9 +251,9 @@ def get_clusterthroughput(cluster_id, network_type):
                 NS.time_series_db_manager.get_plugin().get_delimeter(),
                 1
             )
-        # Validate cluster_id. Attempt to fetch clusters/cluster_id fails
+        # Validate integration_id. Attempt to fetch clusters/integration_id fails
         # with EtcdKeyNotFound if cluster if is invalid
-        central_store_util.read_key('/clusters/%s' % cluster_id)
+        central_store_util.read_key('/clusters/%s' % integration_id)
         return Response(
             NS.time_series_db_manager.\
             get_plugin().\
@@ -386,11 +386,11 @@ def get_sdsutilization(sds_type, utiliation_type):
         return Response(str(ex), status=500, mimetype='application/json')
 
 
-@app.route("/monitoring/clusters/<cluster_id>/summary")
-def get_cluster_summary(cluster_id):
+@app.route("/monitoring/clusters/<integration_id>/summary")
+def get_cluster_summary(integration_id):
     try:
         cluster_summary = central_store_util.get_cluster_summary(
-            cluster_id
+            integration_id
         )
         return Response(
             json.dumps(cluster_summary),
@@ -400,7 +400,7 @@ def get_cluster_summary(cluster_id):
     except (AttributeError, etcd.EtcdException) as ex:
         return Response(
             'Failed to fetch cluster summary for cluster %s.Error %s' % (
-                cluster_id,
+                integration_id,
                 str(ex)
             ),
             status=500,
@@ -423,7 +423,7 @@ def get_clusters_iops():
                     end_time = request_param[1]
                 elif request_param[0] == "interval":
                     time_interval = request_param[1]
-                elif request_param[0] == "cluster_ids":
+                elif request_param[0] == "integration_ids":
                     cluster_list = (request.args.items()[0][1]).split(",")
         iops = []
         ret_code = 200

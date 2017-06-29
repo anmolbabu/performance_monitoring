@@ -56,7 +56,7 @@ class SDSPlugin(object):
         )
 
     @abstractmethod
-    def get_cluster_summary(self, cluster_id, cluster_name):
+    def get_cluster_summary(self, integration_id, cluster_name):
         raise NotImplementedError(
             "The plugins overriding SDSPlugin should mandatorily override this"
         )
@@ -81,14 +81,14 @@ class SDSPlugin(object):
             cluster_tendrl_context = {}
             cluster_status = {}
             sds_name = central_store_util.get_cluster_sds_name(
-                cluster_summary.cluster_id
+                cluster_summary.integration_id
             )
             try:
                 cluster_tendrl_context = central_store_util.read(
-                    '/clusters/%s/TendrlContext' % cluster_summary.cluster_id
+                    '/clusters/%s/TendrlContext' % cluster_summary.integration_id
                 )
                 cluster_status = central_store_util.read(
-                    '/clusters/%s/GlobalDetails' % cluster_summary.cluster_id
+                    '/clusters/%s/GlobalDetails' % cluster_summary.integration_id
                 )
                 cluster_status = cluster_status.get('status')
             except EtcdKeyNotFound:
@@ -118,7 +118,7 @@ class SDSPlugin(object):
                     parse_resource_alerts(
                         None,
                         pm_consts.CLUSTER,
-                        cluster_id=cluster_summary.cluster_id
+                        integration_id=cluster_summary.integration_id
                     )
                 cluster_alerts.extend(cluster_critical_alerts)
                 cluster_alerts.extend(cluster_warning_alerts)
@@ -299,7 +299,7 @@ class SDSPlugin(object):
                     system_services_count[service_name] = service_counter
         return system_services_count
 
-    def get_cluster_throughput(self, nw_type, cluster_nodes, cluster_id):
+    def get_cluster_throughput(self, nw_type, cluster_nodes, integration_id):
         throughput = 0.0
         cnt = 0
         for node_id, node_context in cluster_nodes.iteritems():
@@ -338,7 +338,7 @@ class SDSPlugin(object):
             throughput = (throughput * 1.0) / (cnt * 1.0)
         NS.time_series_db_manager.get_plugin().push_metrics(
             NS.time_series_db_manager.get_timeseriesnamefromresource(
-                cluster_id=cluster_id,
+                integration_id=integration_id,
                 network_type=nw_type,
                 resource_name=pm_consts.CLUSTER_THROUGHPUT,
                 utilization_type=pm_consts.USED
@@ -370,11 +370,11 @@ class SDSMonitoringManager(object):
         self.supported_sds = []
         self.load_sds_plugins()
 
-    def get_cluster_summary(self, cluster_id, cluster_name):
-        sds_name = central_store_util.get_cluster_sds_name(cluster_id)
+    def get_cluster_summary(self, integration_id, cluster_name):
+        sds_name = central_store_util.get_cluster_sds_name(integration_id)
         for plugin in SDSPlugin.plugins:
             if plugin.name == sds_name:
-                return plugin.get_cluster_summary(cluster_id, cluster_name)
+                return plugin.get_cluster_summary(integration_id, cluster_name)
 
     def compute_system_summary(self, cluster_summaries):
         for plugin in SDSPlugin.plugins:

@@ -12,7 +12,7 @@ class ClusterSummary(objects.BaseObject):
                  node_summaries=[],
                  sds_det={'': ''},
                  sds_type='',
-                 cluster_id='',
+                 integration_id='',
                  *args,
                  **kwargs
                  ):
@@ -20,7 +20,7 @@ class ClusterSummary(objects.BaseObject):
             ClusterSummary,
             self
         ).__init__(*args, **kwargs)
-        self.cluster_id = cluster_id
+        self.integration_id = integration_id
         self.utilization = utilization
         self.iops = iops
         self.hosts_count = hosts_count
@@ -59,9 +59,9 @@ class ClusterSummary(objects.BaseObject):
             node_summaries=self.node_summaries,
             sds_det=self.sds_det,
             sds_type=self.sds_type,
-            cluster_id=self.cluster_id
+            integration_id=self.integration_id
         )
 
     def render(self):
-        self.value = self.value.format(self.cluster_id)
+        self.value = self.value.format(self.integration_id)
         return super(ClusterSummary, self).render()
