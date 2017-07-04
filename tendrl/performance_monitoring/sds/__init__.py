@@ -402,7 +402,7 @@ class SDSMonitoringManager(object):
             )
             return
         for plugin in SDSPlugin.plugins:
-            if plugin.name == sds_tendrl_context['sds_name']:
+            if plugin.name == sds_tendrl_context.get('sds_name', ''):
                 return plugin.configure_monitoring(sds_tendrl_context)
         Event(
             Message(

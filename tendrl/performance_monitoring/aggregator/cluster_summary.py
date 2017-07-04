@@ -162,6 +162,7 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
         used = 0
         total = 0
         percent_used = 0
+        sds_name = ''
         if utilization.get('used_capacity'):
             used = utilization.get('used_capacity')
         elif utilization.get('used'):
