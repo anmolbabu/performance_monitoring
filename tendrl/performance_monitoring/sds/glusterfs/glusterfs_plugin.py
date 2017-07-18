@@ -51,7 +51,7 @@ class GlusterFSPlugin(SDSPlugin):
                         plugin_config.encode('ascii', 'ignore')
                     )
                 p_conf = copy.deepcopy(plugin_config)
-                p_conf['cluster_id'] = \
+                p_conf['integration_id'] = \
                     sds_tendrl_context['integration_id']
                 p_conf['cluster_name'] = \
                     sds_tendrl_context['cluster_name']
@@ -73,7 +73,7 @@ class GlusterFSPlugin(SDSPlugin):
             })
         return configs
 
-    def get_brick_status_wise_counts(self, cluster_id, bricks):
+    def get_brick_status_wise_counts(self, integration_id, bricks):
         brick_status_wise_counts = {
             'stopped': 0,
             'total': 0,
@@ -92,7 +92,7 @@ class GlusterFSPlugin(SDSPlugin):
         crit_alerts, warn_alerts = parse_resource_alerts(
             'brick',
             pm_consts.CLUSTER,
-            cluster_id=cluster_id
+            integration_id=integration_id
         )
         brick_status_wise_counts[
             pm_consts.CRITICAL_ALERTS
@@ -102,11 +102,11 @@ class GlusterFSPlugin(SDSPlugin):
         ] = len(warn_alerts)
         return brick_status_wise_counts
 
-    def get_cluster_volume_ids(self, cluster_id):
+    def get_cluster_volume_ids(self, integration_id):
         volume_ids = []
         try:
             etcd_volume_ids = central_store_util.read_key(
-                '/clusters/%s/Volumes' % cluster_id
+                '/clusters/%s/Volumes' % integration_id
             )
         except EtcdKeyNotFound:
             return volume_ids
@@ -117,14 +117,14 @@ class GlusterFSPlugin(SDSPlugin):
                 volume_ids.append(etcd_volume_contents[4])
         return volume_ids
 
-    def get_cluster_volumes(self, cluster_id):
+    def get_cluster_volumes(self, integration_id):
         volumes = {}
-        volume_ids = self.get_cluster_volume_ids(cluster_id)
+        volume_ids = self.get_cluster_volume_ids(integration_id)
         for volume_id in volume_ids:
             try:
                 volume = etcd_read_key(
                     '/clusters/%s/Volumes/%s' % (
-                        cluster_id,
+                        integration_id,
                         volume_id
                     )
                 )
@@ -133,7 +133,7 @@ class GlusterFSPlugin(SDSPlugin):
                 continue
         return volumes
 
-    def get_volume_status_wise_counts(self, cluster_id, volumes):
+    def get_volume_status_wise_counts(self, integration_id, volumes):
         volume_status_wise_counts = {
             'down': 0,
             'total': 0,
@@ -151,7 +151,7 @@ class GlusterFSPlugin(SDSPlugin):
         volumes_up_degraded = 0
         try:
             volumes_up_degraded = central_store_util.read_key(
-                '/clusters/%s/GlobalDetails/volume_up_degraded' % cluster_id
+                '/clusters/%s/GlobalDetails/volume_up_degraded' % integration_id
             ).value
         except EtcdKeyNotFound:
             pass
@@ -160,7 +160,7 @@ class GlusterFSPlugin(SDSPlugin):
         crit_alerts, warn_alerts = parse_resource_alerts(
             'volume',
             pm_consts.CLUSTER,
-            cluster_id=cluster_id
+            integration_id=integration_id
         )
         volume_status_wise_counts[
             pm_consts.CRITICAL_ALERTS
@@ -182,11 +182,11 @@ class GlusterFSPlugin(SDSPlugin):
             most_used_volumes.append(vol_det)
         return most_used_volumes[:5]
 
-    def get_cluster_bricks(self, cluster_id):
+    def get_cluster_bricks(self, integration_id):
         ret_val = {}
         try:
             etcd_bricks = central_store_util.read_key(
-                '/clusters/%s/Bricks/all' % cluster_id
+                '/clusters/%s/Bricks/all' % integration_id
             )
         except EtcdKeyNotFound:
             return ret_val
@@ -195,7 +195,7 @@ class GlusterFSPlugin(SDSPlugin):
                 etcd_brick_key_contents = etcd_brick.key.split('/')
                 brick = etcd_read_key(
                     '/clusters/%s/Bricks/all/%s' % (
-                        cluster_id,
+                        integration_id,
                         etcd_brick_key_contents[5]
                     )
                 )
@@ -207,11 +207,11 @@ class GlusterFSPlugin(SDSPlugin):
                 ):
                     brick['utilization']['vol_name'] = \
                         central_store_util.get_volume_name(
-                            cluster_id,
+                            integration_id,
                             brick['vol_id']
                     )
                     brick['utilization']['cluster_name'] = \
-                        central_store_util.get_cluster_name(cluster_id)
+                        central_store_util.get_cluster_name(integration_id)
                     brick['utilization']['brick_path'] = \
                         brick['brick_path']
                     brick['utilization']['hostname'] = \
@@ -263,22 +263,22 @@ class GlusterFSPlugin(SDSPlugin):
         brick_utilizations.reverse()
         return brick_utilizations[:5]
 
-    def get_cluster_summary(self, cluster_id, cluster_name):
+    def get_cluster_summary(self, integration_id, cluster_name):
         ret_val = {}
-        cluster_node_ids = central_store_util.get_cluster_node_ids(cluster_id)
+        cluster_node_ids = central_store_util.get_cluster_node_ids(integration_id)
         ret_val['services_count'] = self.get_services_count(
             cluster_node_ids
         )
-        volumes = self.get_cluster_volumes(cluster_id)
-        bricks = self.get_cluster_bricks(cluster_id)
+        volumes = self.get_cluster_volumes(integration_id)
+        bricks = self.get_cluster_bricks(integration_id)
         ret_val['volume_status_wise_counts'] = \
             self.get_volume_status_wise_counts(
-                cluster_id,
+                integration_id,
                 volumes
         )
         ret_val['brick_status_wise_counts'] = \
             self.get_brick_status_wise_counts(
-                cluster_id,
+                integration_id,
                 bricks
         )
         ret_val['most_used_volumes'] = self.get_most_used_volumes(
@@ -287,8 +287,8 @@ class GlusterFSPlugin(SDSPlugin):
         )
         ret_val['throughput'] = self.get_cluster_throughput(
             'cluster_network',
-            central_store_util.get_cluster_node_contexts(cluster_id),
-            cluster_id
+            central_store_util.get_cluster_node_contexts(integration_id),
+            integration_id
         )
         ret_val['most_used_bricks'] = self.get_most_used_bricks(
             bricks
@@ -296,7 +296,7 @@ class GlusterFSPlugin(SDSPlugin):
         connection_active = 0
         try:
             connection_active = central_store_util.read_key(
-                '/clusters/%s/GlobalDetails/connection_active' % cluster_id
+                '/clusters/%s/GlobalDetails/connection_active' % integration_id
             ).value
         except EtcdKeyNotFound:
             pass
@@ -304,7 +304,7 @@ class GlusterFSPlugin(SDSPlugin):
         connection_count = 0
         try:
             connection_count = central_store_util.read_key(
-                '/clusters/%s/GlobalDetails/connection_count' % cluster_id
+                '/clusters/%s/GlobalDetails/connection_count' % integration_id
             ).value
         except EtcdKeyNotFound:
             pass
@@ -550,11 +550,11 @@ class GlusterFSPlugin(SDSPlugin):
                 node_ip = ip
                 break
         try:
-            cluster_id = central_store_util.get_node_cluster_id(
+            integration_id = central_store_util.get_node_integration_id(
                 node_id
             )
-            if cluster_id:
-                bricks = self.get_cluster_bricks(cluster_id)
+            if integration_id:
+                bricks = self.get_cluster_bricks(integration_id)
                 for brick_path, brick_det in bricks.iteritems():
                     if (
                         brick_det['hostname'] == node_name or
@@ -571,7 +571,7 @@ class GlusterFSPlugin(SDSPlugin):
             crit_alerts, warn_alerts = parse_resource_alerts(
                 'brick',
                 pm_consts.CLUSTER,
-                cluster_id=cluster_id
+                integration_id=integration_id
             )
             count = 0
             for alert in crit_alerts:

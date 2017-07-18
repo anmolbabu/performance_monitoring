@@ -20,19 +20,19 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
         super(ClusterSummarise, self).__init__()
         self._complete = gevent.event.Event()
 
-    def parse_host_count(self, cluster_id):
+    def parse_host_count(self, integration_id):
         status_wise_count = {
             'total': 0,
             'down': 0,
             'crit_alert_count': 0,
             'warn_alert_count': 0
         }
-        cluster_nodes = central_store_util.get_cluster_node_ids(cluster_id)
+        cluster_nodes = central_store_util.get_cluster_node_ids(integration_id)
         for node_id in cluster_nodes:
             try:
                 node_context = central_store_util.read(
                     '/clusters/%s/nodes/%s/NodeContext' % (
-                        cluster_id,
+                        integration_id,
                         node_id
                     )
                 )
@@ -48,7 +48,7 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
                         payload={
                             "message": 'Failed to fetch node-context from'
                             ' /clusters/%s/nodes/%s/NodeContext' % (
-                                cluster_id,
+                                integration_id,
                                 node_id
                             ),
                             "exception": ex
@@ -88,9 +88,9 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
                         status_wise_count['warn_alert_count'] + 1
         return status_wise_count
 
-    def cluster_nodes_summary(self, cluster_id):
+    def cluster_nodes_summary(self, integration_id):
         node_summaries = []
-        node_ids = central_store_util.get_cluster_node_ids(cluster_id)
+        node_ids = central_store_util.get_cluster_node_ids(integration_id)
         for node_id in node_ids:
             try:
                 node_summary = central_store_util.read(
@@ -116,12 +116,12 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
                 continue
         return node_summaries
 
-    def get_cluster_iops(self, cluster_id):
+    def get_cluster_iops(self, integration_id):
         try:
             entity_name, metric_name = NS.time_series_db_manager.\
                 get_timeseriesnamefromresource(
                     resource_name=pm_consts.CLUSTER_IOPS,
-                    cluster_id=cluster_id
+                    integration_id=integration_id
                 ).split(
                     NS.time_series_db_manager.get_plugin().get_delimeter(),
                     1
@@ -137,11 +137,11 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
         ):
             return pm_consts.NOT_AVAILABLE
 
-    def parse_cluster(self, cluster_id):
+    def parse_cluster(self, integration_id):
         utilization = {}
         try:
             utilization = central_store_util.read(
-                '/clusters/%s/Utilization' % cluster_id
+                '/clusters/%s/Utilization' % integration_id
             )
         except (
             EtcdKeyNotFound,
@@ -154,7 +154,7 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
                     publisher=NS.publisher_id,
                     payload={
                         "message": 'Utilization not available for cluster'
-                        ' %s.' % cluster_id,
+                        ' %s.' % integration_id,
                         "exception": ex
                     }
                 )
@@ -174,7 +174,7 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
         if utilization.get('pcnt_used'):
             percent_used = utilization.get('pcnt_used')
         try:
-            sds_name = central_store_util.get_cluster_sds_name(cluster_id)
+            sds_name = central_store_util.get_cluster_sds_name(integration_id)
         except (
             EtcdKeyNotFound,
             EtcdException,
@@ -186,7 +186,7 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
                     publisher=NS.publisher_id,
                     payload={
                         "message": 'Error caught fetching sds name of'
-                        ' cluster %s.' % cluster_id,
+                        ' cluster %s.' % integration_id,
                         "exception": ex
                     }
                 )
@@ -197,23 +197,23 @@ class ClusterSummarise(gevent.greenlet.Greenlet):
                 'used': int(used),
                 'percent_used': float(percent_used)
             },
-            iops=str(self.get_cluster_iops(cluster_id)),
-            hosts_count=self.parse_host_count(cluster_id),
+            iops=str(self.get_cluster_iops(integration_id)),
+            hosts_count=self.parse_host_count(integration_id),
             sds_type=sds_name,
             node_summaries=self.cluster_nodes_summary(
-                cluster_id
+                integration_id
             ),
             sds_det=NS.sds_monitoring_manager.get_cluster_summary(
-                cluster_id,
-                central_store_util.get_cluster_name(cluster_id)
+                integration_id,
+                central_store_util.get_cluster_name(integration_id)
             ),
-            cluster_id=cluster_id,
+            integration_id=integration_id,
         )
 
     def _run(self):
         while not self._complete.is_set():
             cluster_summaries = []
-            clusters = central_store_util.get_cluster_ids()
+            clusters = central_store_util.get_integration_ids()
             for clusterid in clusters:
                 gevent.sleep(0.1)
                 try:

@@ -45,10 +45,10 @@ namespace.performance_monitoring:
           type: Dict
         sds_type:
           type: String
-        cluster_id:
+        integration_id:
           type: String
       enabled: true
-      value: monitoring/summary/clusters/$ClusterSummary.cluster_id
+      value: monitoring/summary/clusters/$ClusterSummary.integration_id
       list: monitoring/summary/clusters
       help: "Cluster Summary"
     SystemSummary:

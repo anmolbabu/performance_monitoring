@@ -163,16 +163,16 @@ class TimeSeriesDBManager(object):
         pattern = {
             pm_consts.SYSTEM_UTILIZATION: '$sds_type{0}utilization{0}'
             '$utilization_type',
-            pm_consts.CLUSTER_UTILIZATION: 'cluster_$cluster_id{0}'
+            pm_consts.CLUSTER_UTILIZATION: 'cluster_$integration_id{0}'
             'cluster_utilization{0}$utilization_type',
-            pm_consts.CLUSTER_THROUGHPUT: 'cluster_$cluster_id{0}'
+            pm_consts.CLUSTER_THROUGHPUT: 'cluster_$integration_id{0}'
             'throughput{0}$network_type{0}$utilization_type',
             pm_consts.SYSTEM_THROUGHPUT: '$sds_type{0}'
             'throughput{0}$network_type{0}$utilization_type',
             pm_consts.NODE_THROUGHPUT: '$node_name{0}'
             'network_throughput-$network_type{0}$utilization_type',
             pm_consts.LATENCY: 'ping{0}ping-$underscored_monitoring_node_name',
-            pm_consts.IOPS: 'cluster_$cluster_id{0}cluster_iops_read_write{0}'
+            pm_consts.IOPS: 'cluster_$integration_id{0}cluster_iops_read_write{0}'
             '$utilization_type',
             pm_consts.SWAP: 'swap{0}$utilization_type',
             pm_consts.SWAP_TOTAL: '$utilization_type',
@@ -180,7 +180,7 @@ class TimeSeriesDBManager(object):
             '$utilization_type',
             pm_consts.STORAGE: '$underscored_node_name{0}storage{0}'
             '$utilization_type',
-            pm_consts.CLUSTER_IOPS: 'cluster_$cluster_id{0}'
+            pm_consts.CLUSTER_IOPS: 'cluster_$integration_id{0}'
             'cluster_iops_read_write{0}gauge-total'
         }
         if not pattern.get(resource_name):

@@ -12,10 +12,10 @@ class ConfigureClusterMonitoring(gevent.greenlet.Greenlet):
         self._complete = gevent.event.Event()
 
     def configure_cluster_monitoring(self):
-        cluster_ids = []
+        integration_ids = []
         while not self._complete.is_set():
             try:
-                cluster_ids = central_store_util.get_cluster_ids()
+                integration_ids = central_store_util.get_integration_ids()
             except (AttributeError, EtcdException)as ex:
                 Event(
                     ExceptionMessage(
@@ -29,9 +29,9 @@ class ConfigureClusterMonitoring(gevent.greenlet.Greenlet):
                     )
                 )
                 pass
-            for cluster_id in cluster_ids:
+            for integration_id in integration_ids:
                 configs = NS.sds_monitoring_manager.configure_monitoring(
-                    cluster_id
+                    integration_id
                 )
                 if configs:
                     for config in configs:
