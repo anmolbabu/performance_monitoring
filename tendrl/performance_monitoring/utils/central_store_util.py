@@ -53,7 +53,7 @@ def read(key):
 
 def get_configs():
     # TODO(Anmol) : Attempt reading:
-    # /_tendrl/config/performance_monitoring/clusters/{cluster-id} and if
+    # /_tendrl/config/performance_monitoring/clusters/{integration-id} and if
     # not already present, default back to defaults in:
     #  /_tendrl/config/performance_monitoring
     try:
@@ -123,15 +123,15 @@ def get_node_cluster_name(node_id):
         raise ex
 
 
-def get_cluster_ids():
+def get_integration_ids():
     try:
-        cluster_ids = []
+        integration_ids = []
         clusters_etcd = read_key('/clusters')
         for cluster in clusters_etcd.leaves:
             cluster_key_contents = cluster.key.split('/')
             if len(cluster_key_contents) == 3:
-                cluster_ids.append(cluster_key_contents[2])
-        return cluster_ids
+                integration_ids.append(cluster_key_contents[2])
+        return integration_ids
     except EtcdKeyNotFound:
         return []
     except (
@@ -201,11 +201,11 @@ def get_node_alerts(node_id):
     return node_alerts_arr
 
 
-def get_cluster_alerts(cluster_id):
+def get_cluster_alerts(integration_id):
     cluster_alerts = []
     try:
         c_alerts = read(
-            '/alerting/clusters/%s' % cluster_id
+            '/alerting/clusters/%s' % integration_id
         )
         for alert_id, alert in c_alerts.iteritems():
             cluster_alerts.append(alert)
@@ -214,14 +214,14 @@ def get_cluster_alerts(cluster_id):
         return cluster_alerts
 
 
-def get_cluster_summary(cluster_id):
+def get_cluster_summary(integration_id):
     try:
         summary = ClusterSummary(
-            cluster_id=cluster_id
+            integration_id=integration_id
         )
         if not summary.exists():
             raise EtcdException(
-                "No summary found for cluster %s" % cluster_id
+                "No summary found for cluster %s" % integration_id
             )
         summary = summary.load().to_json()
         for key, value in summary.items():
@@ -289,27 +289,27 @@ def get_node_summary(node_ids=None):
 
 
 def get_cluster_iops(
-    cluster_ids=None,
+    integration_ids=None,
     time_interval=None,
     start_time=None,
     end_time=None
 ):
     iops = []
     exs = ''
-    if cluster_ids is None:
-        cluster_ids = get_cluster_ids()
-    for cluster_id in cluster_ids:
+    if integration_ids is None:
+        integration_ids = get_integration_ids()
+    for integration_id in integration_ids:
         try:
             entity_name, metric_name = NS.time_series_db_manager.\
                 get_timeseriesnamefromresource(
-                    cluster_id=cluster_id,
+                    integration_id=integration_id,
                     resource_name=pm_consts.IOPS,
                     utilization_type=pm_consts.TOTAL
                 ).split(
                     NS.time_series_db_manager.get_plugin().get_delimeter(),
                     1
                 )
-            read_key('/clusters/%s' % cluster_id)
+            read_key('/clusters/%s' % integration_id)
             cluster_iops = NS.time_series_db_manager.get_plugin(
             ).get_metric_stats(
                 entity_name,
@@ -323,11 +323,11 @@ def get_cluster_iops(
                 isinstance(json_io, list) and
                 len(json_io) > 0
             ):
-                json_io[0]['cluster_id'] = cluster_id
+                json_io[0]['integration_id'] = integration_id
                 iops.append(json_io[0])
             else:
                 json_io = {
-                    'cluster_id': cluster_id,
+                    'integration_id': integration_id,
                     'target': '',
                     'datapoints': []
                 }
@@ -341,11 +341,11 @@ def get_cluster_iops(
         ) as ex:
             exs = "%s.Failed to fetch iops of cluster with id: %s.Error %s" % (
                 exs,
-                cluster_id,
+                integration_id,
                 str(ex)
             )
             continue
-    if len(iops) == len(cluster_ids):
+    if len(iops) == len(integration_ids):
         return iops, 200, None
     else:
         if len(iops) == 0:
@@ -382,11 +382,11 @@ def get_node_selinux_mode(node_id):
     ).value
 
 
-def get_cluster_node_ids(cluster_id):
+def get_cluster_node_ids(integration_id):
     cluster_nodes = []
     try:
         nodes = read_key(
-            '/clusters/%s/nodes' % cluster_id
+            '/clusters/%s/nodes' % integration_id
         )
         for node in nodes.leaves:
             key_contents = node.key.split('/')
@@ -397,16 +397,16 @@ def get_cluster_node_ids(cluster_id):
         return cluster_nodes
 
 
-def get_cluster_name(cluster_id):
+def get_cluster_name(integration_id):
     return read_key(
-        '/clusters/%s/TendrlContext/cluster_name' % cluster_id
+        '/clusters/%s/TendrlContext/cluster_name' % integration_id
     ).value
 
 
-def get_volume_name(cluster_id, vol_id):
+def get_volume_name(integration_id, vol_id):
     return read_key(
         '/clusters/%s/Volumes/%s/name' % (
-            cluster_id,
+            integration_id,
             vol_id
         )
     ).value
@@ -423,20 +423,20 @@ def get_node_sds_name(node_id):
     return sds_name
 
 
-def get_node_cluster_id(node_id):
-    cluster_id = ''
+def get_node_integration_id(node_id):
+    integration_id = ''
     try:
-        cluster_id = read_key(
+        integration_id = read_key(
             '/nodes/%s/TendrlContext/integration_id' % node_id
         ).value
     except (AttributeError, EtcdException):
         pass
-    return cluster_id
+    return integration_id
 
 
-def get_cluster_node_contexts(cluster_id):
+def get_cluster_node_contexts(integration_id):
     node_contexts = {}
-    node_ids = get_cluster_node_ids(cluster_id)
+    node_ids = get_cluster_node_ids(integration_id)
     for node_id in node_ids:
         try:
             node_context = read(
@@ -448,15 +448,15 @@ def get_cluster_node_contexts(cluster_id):
     return node_contexts
 
 
-def get_node_names_in_cluster(cluster_id):
+def get_node_names_in_cluster(integration_id):
     ret_val = []
-    nodes = read('/clusters/%s/nodes' % cluster_id)
+    nodes = read('/clusters/%s/nodes' % integration_id)
     for node_id, node_det in nodes.iteritems():
         ret_val.append(node_det.get('NodeContext', {}).get('fqdn'))
     return ret_val
 
 
-def get_cluster_sds_name(cluster_id):
+def get_cluster_sds_name(integration_id):
     return read_key(
-        '/clusters/%s/TendrlContext/sds_name' % cluster_id
+        '/clusters/%s/TendrlContext/sds_name' % integration_id
     ).value

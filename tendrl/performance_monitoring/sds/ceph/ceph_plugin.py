@@ -58,7 +58,7 @@ class CephPlugin(SDSPlugin):
                             plugin_config.encode('ascii', 'ignore')
                         )
                     p_conf = copy.deepcopy(plugin_config)
-                    p_conf['cluster_id'] = \
+                    p_conf['integration_id'] = \
                         sds_tendrl_context['integration_id']
                     p_conf['cluster_name'] = \
                         sds_tendrl_context['cluster_name']
@@ -69,7 +69,7 @@ class CephPlugin(SDSPlugin):
                         'fqdn': sds_node_context['fqdn']
                     })
                 plugin_config = {
-                    'cluster_id': sds_tendrl_context['integration_id'],
+                    'integration_id': sds_tendrl_context['integration_id'],
                     'cluster_name': sds_tendrl_context['cluster_name']
                 }
                 configs.append({
@@ -103,12 +103,12 @@ class CephPlugin(SDSPlugin):
             })
         return configs
 
-    def get_nw_node_interfaces(self, node_id, nw_type, cluster_id):
+    def get_nw_node_interfaces(self, node_id, nw_type, integration_id):
         nw_node_interfaces = []
         try:
             nw_subnet = etcd_read_key(
                 '/clusters/%s/maps/config/data' % (
-                    cluster_id
+                    integration_id
                 )
             )
             nw_subnet = json.loads(nw_subnet.get('data', '{}'))
@@ -143,11 +143,11 @@ class CephPlugin(SDSPlugin):
             )
         return nw_node_interfaces
 
-    def get_cluster_pool_ids(self, cluster_id):
+    def get_cluster_pool_ids(self, integration_id):
         pools = []
         try:
             etcd_pools = central_store_util.read_key(
-                '/clusters/%s/Pools/' % cluster_id
+                '/clusters/%s/Pools/' % integration_id
             )
             for etcd_pool in etcd_pools.leaves:
                 # /clusters/a88ada59-f52b-4608-9311-96cccfbbbf6a/Pools/0
@@ -158,14 +158,14 @@ class CephPlugin(SDSPlugin):
             pass
         return pools
 
-    def get_cluster_pools(self, cluster_id):
+    def get_cluster_pools(self, integration_id):
         pools = {}
         try:
-            pool_ids = self.get_cluster_pool_ids(cluster_id)
+            pool_ids = self.get_cluster_pool_ids(integration_id)
             for pool_id in pool_ids:
                 pool = etcd_read_key(
                     '/clusters/%s/Pools/%s' % (
-                        cluster_id,
+                        integration_id,
                         pool_id
                     )
                 )
@@ -184,7 +184,7 @@ class CephPlugin(SDSPlugin):
             most_used_pools.append(pool_det)
         return most_used_pools[:5]
 
-    def get_rbd_status_wise_counts(self, cluster_id, rbds):
+    def get_rbd_status_wise_counts(self, integration_id, rbds):
         # No status for rbds so currently only alert counters will be available
         rbd_status_wise_counts = {
             pm_consts.CRITICAL_ALERTS: 0,
@@ -195,7 +195,7 @@ class CephPlugin(SDSPlugin):
         crit_alerts, warn_alerts = parse_resource_alerts(
             'rbd',
             pm_consts.CLUSTER,
-            cluster_id=cluster_id
+            integration_id=integration_id
         )
         rbd_status_wise_counts[
             pm_consts.CRITICAL_ALERTS
@@ -205,7 +205,7 @@ class CephPlugin(SDSPlugin):
         ] = len(warn_alerts)
         return rbd_status_wise_counts
 
-    def get_pool_status_wise_counts(self, cluster_id, pools):
+    def get_pool_status_wise_counts(self, integration_id, pools):
         # No status for pools, so only alert counters will be available
         pool_status_wise_counts = {
             pm_consts.CRITICAL_ALERTS: 0,
@@ -217,7 +217,7 @@ class CephPlugin(SDSPlugin):
         crit_alerts, warn_alerts = parse_resource_alerts(
             'pool',
             pm_consts.CLUSTER,
-            cluster_id=cluster_id
+            integration_id=integration_id
         )
         pool_status_wise_counts[
             pm_consts.CRITICAL_ALERTS
@@ -227,13 +227,13 @@ class CephPlugin(SDSPlugin):
         ] = len(warn_alerts)
         return pool_status_wise_counts
 
-    def get_rbd_names(self, cluster_id, pool_ids):
+    def get_rbd_names(self, integration_id, pool_ids):
         rbd_names = {}
         for pool_id in pool_ids:
             try:
                 etcd_pool_rbds = central_store_util.read_key(
                     '/clusters/%s/Pools/%s/Rbds' % (
-                        cluster_id,
+                        integration_id,
                         pool_id
                     )
                 )
@@ -248,13 +248,13 @@ class CephPlugin(SDSPlugin):
                 continue
         return rbd_names
 
-    def get_rbds(self, cluster_id, pools):
+    def get_rbds(self, integration_id, pools):
         rbds = []
         pool_ids = []
         try:
             for pool_id, pool in pools.iteritems():
                 pool_ids.append(pool_id)
-            rbd_names = self.get_rbd_names(cluster_id, pool_ids)
+            rbd_names = self.get_rbd_names(integration_id, pool_ids)
         except (EtcdKeyNotFound, TendrlPerformanceMonitoringException):
             pass
         for pool_id, pool_rbds in rbd_names.iteritems():
@@ -262,7 +262,7 @@ class CephPlugin(SDSPlugin):
                 try:
                     rbd_dict = etcd_read_key(
                         '/clusters/%s/Pools/%s/Rbds/%s' % (
-                            cluster_id,
+                            integration_id,
                             pool_id,
                             rbd
                         )
@@ -288,11 +288,11 @@ class CephPlugin(SDSPlugin):
         most_used_rbds.reverse()
         return most_used_rbds[:5]
 
-    def get_cluster_osds(self, cluster_id):
+    def get_cluster_osds(self, integration_id):
         osds = []
         try:
             osd_data = etcd_read_key(
-                '/clusters/%s/maps/osd_map' % cluster_id
+                '/clusters/%s/maps/osd_map' % integration_id
             )
             osd_data = json.loads(osd_data['data'])
             osds = osd_data.get('osds')
@@ -302,7 +302,7 @@ class CephPlugin(SDSPlugin):
             pass
         return osds
 
-    def get_osd_status_wise_counts(self, cluster_id, osds):
+    def get_osd_status_wise_counts(self, integration_id, osds):
         osd_status_wise_counts = {
             'total': 0,
             'down': 0,
@@ -319,7 +319,7 @@ class CephPlugin(SDSPlugin):
         crit_alerts, warn_alerts = parse_resource_alerts(
             'osd',
             pm_consts.CLUSTER,
-            cluster_id=cluster_id
+            integration_id=integration_id
         )
         for osd_alert in crit_alerts:
             if (
@@ -336,20 +336,20 @@ class CephPlugin(SDSPlugin):
         ] = len(warn_alerts)
         return osd_status_wise_counts
 
-    def get_mon_status_wise_counts(self, cluster_id):
+    def get_mon_status_wise_counts(self, integration_id):
         mon_status_wise_counts = {
             'outside_quorum': 0,
             'total': 0
         }
         try:
             mons = etcd_read_key(
-                '/clusters/%s/maps/mon_map/data' % cluster_id
+                '/clusters/%s/maps/mon_map/data' % integration_id
             )
             mons = json.loads(mons.get('data', '{}'))
             mons = mons['mons']
             mon_status_wise_counts['total'] = len(mons)
             outside_quorum = etcd_read_key(
-                '/clusters/%s/maps/mon_status/data' % cluster_id
+                '/clusters/%s/maps/mon_status/data' % integration_id
             )
             outside_quorum = json.loads(outside_quorum.get('data', '{}'))
             outside_quorum = outside_quorum.get('outside_quorum', [])
@@ -370,10 +370,10 @@ class CephPlugin(SDSPlugin):
             )
         return mon_status_wise_counts
 
-    def get_pg_counts(self, cluster_id):
+    def get_pg_counts(self, integration_id):
         try:
             pg_summary = etcd_read_key(
-                '/clusters/%s/maps/pg_summary/data' % cluster_id
+                '/clusters/%s/maps/pg_summary/data' % integration_id
             )
             pg_summary = json.loads(pg_summary.get('data', '{}'))
             if 'all' not in pg_summary:
@@ -387,12 +387,12 @@ class CephPlugin(SDSPlugin):
         except (EtcdKeyNotFound, TendrlPerformanceMonitoringException):
             return {}
 
-    def get_cluster_summary(self, cluster_id, cluster_name):
+    def get_cluster_summary(self, integration_id, cluster_name):
         ret_val = {}
-        pools = self.get_cluster_pools(cluster_id)
-        cluster_node_ids = central_store_util.get_cluster_node_ids(cluster_id)
-        rbds = self.get_rbds(cluster_id, pools)
-        osds = self.get_cluster_osds(cluster_id)
+        pools = self.get_cluster_pools(integration_id)
+        cluster_node_ids = central_store_util.get_cluster_node_ids(integration_id)
+        rbds = self.get_rbds(integration_id, pools)
+        osds = self.get_cluster_osds(integration_id)
         ret_val['most_used_pools'] = self.get_most_used_pools(
             cluster_name,
             pools
@@ -405,26 +405,26 @@ class CephPlugin(SDSPlugin):
             rbds
         )
         ret_val['osd_status_wise_counts'] = self.get_osd_status_wise_counts(
-            cluster_id,
+            integration_id,
             osds
         )
         ret_val['rbd_status_wise_counts'] = \
-            self.get_rbd_status_wise_counts(cluster_id, rbds)
+            self.get_rbd_status_wise_counts(integration_id, rbds)
         ret_val['mon_status_wise_counts'] = \
-            self.get_mon_status_wise_counts(cluster_id)
+            self.get_mon_status_wise_counts(integration_id)
         ret_val['pool_status_wise_counts'] = \
-            self.get_pool_status_wise_counts(cluster_id, pools)
-        ret_val['pg_status_wise_counts'] = self.get_pg_counts(cluster_id)
+            self.get_pool_status_wise_counts(integration_id, pools)
+        ret_val['pg_status_wise_counts'] = self.get_pg_counts(integration_id)
         throughput = {}
         throughput['cluster_network'] = self.get_cluster_throughput(
             'cluster_network',
-            central_store_util.get_cluster_node_contexts(cluster_id),
-            cluster_id
+            central_store_util.get_cluster_node_contexts(integration_id),
+            integration_id
         )
         throughput['public_network'] = self.get_cluster_throughput(
             'public_network',
-            central_store_util.get_cluster_node_contexts(cluster_id),
-            cluster_id
+            central_store_util.get_cluster_node_contexts(integration_id),
+            integration_id
         )
         ret_val['throughput'] = throughput
         return ret_val
@@ -707,7 +707,7 @@ class CephPlugin(SDSPlugin):
             pm_consts.CRITICAL_ALERTS: 0,
             pm_consts.WARNING_ALERTS: 0
         }
-        cluster_id = central_store_util.get_node_cluster_id(
+        integration_id = central_store_util.get_node_integration_id(
             node_id
         )
         node_ip = ''
@@ -717,7 +717,7 @@ class CephPlugin(SDSPlugin):
                 node_ip = ip
         try:
             osds = etcd_read_key(
-                '/clusters/%s/maps/osd_map/data/osds' % cluster_id
+                '/clusters/%s/maps/osd_map/data/osds' % integration_id
             )
             osds = ast.literal_eval(osds.get('osds', '[]'))
             for osd in osds:
@@ -734,7 +734,7 @@ class CephPlugin(SDSPlugin):
             crit_alerts, warn_alerts = parse_resource_alerts(
                 'osd',
                 pm_consts.CLUSTER,
-                cluster_id=cluster_id
+                integration_id=integration_id
             )
             count = 0
             for alert in crit_alerts:
