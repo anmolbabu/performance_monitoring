@@ -50,7 +50,7 @@ def initiate_config_generation(node_det):
             # into etcd and hence any action here is reflected to all of them.
             return
         job_params = {
-            'node_ids': [node_det.get('node_id')],
+            'tags': ["tendrl/node_%s" % node_det.get('node_id')],
             "run": 'node_monitoring.flows.ConfigureCollectd',
             'type': 'monitoring',
             "parameters": {
